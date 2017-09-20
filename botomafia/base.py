@@ -12,7 +12,7 @@ class Role(object):
     def configure_role(self):
         pass
 
-    def day_say(self, mode):
+    def day_say(self):
         return None
 
     def day_vote(self):
@@ -21,31 +21,16 @@ class Role(object):
     def day_defence(self):
         pass
 
-    def remove_vote(self, player_id):
+    def move_vote(self, player_id):
         return None
 
-    def kill_both_players(self):
+    def kill_many_players(self, kill_list):
         return False
 
-    def listen_for_day_talk(self, player_id, speech):
+    def listen(self, speech_type, speaker_id, target_id, speech):
         pass
 
-    def listen_for_vote(self, source_player_id, victim_player_id):
-        pass
-
-    def listen_for_day_verdict(self, kill_list):
-        pass
-
-    def listen_for_defence(self, player_id, speech):
-        pass
-
-    def listen_for_morning_update(self, kill_list):
-        pass
-
-    def listen_for_night_talk(self, source_player, victim_player, sign):
-        pass
-
-    def listen_for_postmortem(self):
+    def get_kill_notice(self, player_id, role_type):
         pass
 
     def mafia_night_meet(self, mafia):
@@ -91,7 +76,7 @@ class Sheriff(Civil):
             candidate = self.name
         return candidate
 
-    def get_check_results(self, player_id, status):
+    def get_check_result(self, player_id, status):
         if status == Civil:
             self.trusted.add(player_id)
         elif status == Mafia:
@@ -119,7 +104,7 @@ class Mafia(Role):
     role = "Mafia"
 
     def mafia_night_meet(self, mafia):
-        self.mafia = copy.deepcopy(mafia)
+        self.mafia = copy.copy(mafia)
 
     def night_vote(self):
         return random.choice(skip=self.mafia)
@@ -139,23 +124,23 @@ class Game(object):
         self.create_roles(sheriff, doctor)
         self.players.sort(key=lambda player: player.name)
 
-    def create_roles(self):
+    def create_roles(self, sheriff, doctor):
         self.players = []
-        need_to_create = self.total_count
+        need_to_create = self.total_players
         names = ['player ' + str(y) for y in range(1, need_to_create + 1)]
         random.shuffle(names)
         namegen = (name for name in names)
-        if self.sheriff:
-            self.players.append(self.Sheriff(name=namegen.next()))
+        if sheriff:
+            self.players.append(Sheriff(name=namegen.next(), game=self))
             need_to_create -= 1
-        if self.doctor:
-            self.civils.append(Doctor(name=namegen.next()))
+        if doctor:
+            self.players.append(Doctor(name=namegen.next(), game=self))
             need_to_create -= 1
         for count in range(self.mafia_count):
-            self.players.append(Mafia(name=namegen.next()))
+            self.players.append(Mafia(name=namegen.next(), game=self))
             need_to_create -= 1
-        for count in need_to_create:
-            self.players.append(Civil(name=namegen.next()))
+        for count in range(need_to_create):
+            self.players.append(Civil(name=namegen.next(), game=self))
 
     def list_players(self):
         return [player.name for player in self.players]
@@ -165,7 +150,7 @@ class Game(object):
             if player.name == player_id:
                 self.players.remove(player)
                 return player
-        raise Exception("Player %s not found" % player_id)
+        raise Exception("Player %s not found" % str(player_id))
 
     def _find_players_by_type(self, player_type):
         result = []
@@ -187,18 +172,18 @@ class Game(object):
             return Mafia
         raise Exception("Unknown player type %s" % str(type(player)))
 
-    def _get_mafia(self):
+    def mafia(self):
         return self._find_players_by_type(Mafia)
 
-    def _get_civils(self):
+    def civils(self):
         return self._find_players_by_type(Civil)
 
-    def _get_sherif(self):
+    def sheriff(self):
         sheriffs = self._find_players_by_type(Sheriff)
         if sheriffs:
             return sheriffs[0]
 
-    def _get_doctor(self):
+    def doctor(self):
         doctors = self._find_players_by_type(Doctor)
         if doctors:
             return doctors[0]
@@ -206,27 +191,13 @@ class Game(object):
     def players(self):
         self._find_players_by_type(Role)
 
-    def is_end(self):
-        if len(self._get_mafia) >= len(self._get_civils):
+    def won(self):
+        if len(self.mafia()) >= len(self.civils()):
             return Mafia
-        elif len(self._get_mafia) == 0:
+        elif len(self.mafia()) == 0:
             return Civil
         else:
             return None
-
-    def day_next_player(self):
-        for player in self.players:
-            yield player
-
-    def night_next_player(self):
-        for mafia in self._get_mafia:
-            yield mafia
-        sheriff = self._get_sherif()
-        if sheriff:
-            yield sheriff
-        doctor = self._get_doctor()
-        if doctor:
-            yield doctor
 
 
 class Play(object):
@@ -237,55 +208,99 @@ class Play(object):
         self.game = Game(civil_count, mafia_count, sheriff, doctor)
 
     def start(self):
-        while not self.game.is_end():
+        while not self.game.won():
             self.day()
-            if self.game.is_end():
+            if self.game.won():
                 break
             self.night()
+        return self.game.won()
 
     def day(self):
         self.everybody_speaks()
         kill_list = self.voting()
+        self.kill(kill_list)
 
+    def night(self):
+        victim_id = self.mafia_turn()
+        self.sheriff_turn()
+        healed_id = self.doctor_turn()
+        if victim_id != healed_id:
+            self.kill([victim_id])
+
+    def doctor_turn(self):
+        doctor = self.game.doctor()
+        if doctor:
+            return doctor.heal()
+
+    def sheriff_turn(self):
+        sheriff = self.game.sheriff()
+        if sheriff:
+            pending_id = sheriff.check_player()
+            role_type = self.game.check_player(pending_id)
+            sheriff.get_check_result(pending_id, role_type)
+
+    def broadcast(
+        self, speech_type, speaker_id, target_id=None,
+        speech=None, recievers=None
+    ):
+        if not recievers:
+            recievers = self.game.list_players()
+        for reciver in recievers:
+            self.game._find_player_by_id(reciver).listen(
+                speech_type, speaker_id, target_id, speech
+            )
+
+    def kill(self, kill_list):
+        for victim in kill_list:
+            role_type = self.game.kill(victim)
+            for player in self.game.players:
+                player.get_kill_notice(victim, role_type)
 
     def everybody_speaks(self):
-        for speaker in self.game.list_players():
-            words = speaker.day_say()
-            for listener in self.game.list_players():
-                listener.listen_for_day_talk(speaker.name, words)
-
-    def _announce_day_kills(self, kill_list):
-        for victim_id in kill_list:
-            for person in self.game.list_players():
-                person.listen_for_day_verdict([victim_id])
+        for speaker in self.game.players:
+            speech = speaker.day_say()
+            self.broadcast(speech, "day", speaker.name, None, speech)
 
     def voting(self):
-        neeed_revote = True
-        while need_revote:
-            votes = self.gather_initial_votes()
-            winners = self.get_winners(votes)
+        votes = {}
+        winners = {}
+        new_winners = self.get_winners(votes)
+        new_votes = self.gather_votes()
+        while winners.keys() != new_winners.keys():
+            winners = new_winners
+            votes = new_votes
+            for winner_id in winners:
+                defence = self.game._find_player_by_id(winner_id).day_defence()
+                self.broadcast("defence", winner_id, None, defence)
+            new_votes = self.move_votes(self, votes, winners)
+            new_winners = self.get_winners(new_votes)
+        if len(winners) > 1:
+            return self.autocatastrophy(votes, winners)
+        return winners.keys()
 
-            self.revoting(votes)
-
-    def revoting(self, votes):
-        need_revote = False
-        winners = self.get_winners(votes)
-        for winner in winners.keys():
-            defence_speech = self.game._find_player_by_id(winner).day_defence()
-            for player in self.game.players():
-                player.listen_for_defence(winner, defence_speech)
-        for winner_id, winner_votes in winner.items():
-            for person in winner_votes:
-                new_vote = person.remove_vote(winner_id)
-                if new_vote:
-                    self.update_votes(votes, winner_id, person)
-                    need_revote = True
-        if need_revote:
-            raise NotImplemented("write here")
+    def autocatastrophy(self, votes, winners):
+        voters = self.game.list_players()
+        for winner in winners:
+            voters.remove(winner)
+        yay_nay_list = map(lambda p: p.kill_many_players(winners.keys()),
+                           voters
+                           )
+        yay_count = sum(yay_nay_list)
+        if yay_count < len(voters):
+            return {}
         else:
-            return winners
+            return winners.keys()
 
-        raise NotImplemented()
+    def move_votes(self, old_votes, winners):
+        new_votes = copy.copy(old_votes)
+        for winner_id, his_voters in winners:
+            for voter in his_voters:
+                new_winner_id = voter.move_vote(winner_id)
+                if new_winner_id:
+                    new_votes[winner_id].remove(voter)
+                    new_votes[new_winner_id].append(voter)
+                    self.broadcast("move vote", voter.name, new_winner_id)
+        return new_votes
 
     def get_winners(self, votes):
         max_score = 0
@@ -298,11 +313,24 @@ class Play(object):
                 winners[victim] = votes
         return winners
 
-    def gather_initial_votes(self):
+    def gather_votes(self):
         votes = {}
         for voter in self.game.list_players():
             vote_against = voter.day_vote()
-            for listener in self.game.list_players():
-                listener.listen_for_vote(voter.name, vote_against)
-                votes[vote_against] = votes.get(vote_against, []) + voter
+            self.broadcast("day_vote", voter.name, vote_against, None)
+            votes[vote_against] = votes.get(vote_against, []) + voter
         return votes
+
+
+def main():
+    play = Play()
+    result = play.start()
+    print(result)
+    if result == Mafia:
+        raise SystemExit(1)
+    else:
+        raise SystemExit(0)
+
+
+if __name__ == '__main__':
+    main()
