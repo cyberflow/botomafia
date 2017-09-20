@@ -2,32 +2,11 @@ import random
 import copy
 
 
-class Action(object):
-    def __init__(self, player_id):
-        self.player = player_id
-
-
-class Heal(Action):
-    pass
-
-
-class Kill(Action):
-    pass
-
-
-class CheckSide(Action):
-    pass
-
-
-class Guilty(Action):
-    pass
-
-
 class Role(object):
 
     def __init__(self, name, game):
         self.name = name
-        self.game_rules = game
+        self.game = game
         self.configure_role()
 
     def configure_role(self):
@@ -104,7 +83,9 @@ class Sheriff(Civil):
         self.known_mafia = set([])
 
     def check_player(self):
-        candidates = self.game.list_players(skip=self.trusted & self.known_mafia)
+        candidates = self.game.list_players(
+            skip=self.trusted & self.known_mafia
+        )
         candidate = random.choose(candidates)
         if not candidate:
             candidate = self.name
@@ -145,7 +126,13 @@ class Mafia(Role):
 
 
 class Game(object):
-    def __init__(self, civil_count=7, mafia_count=3, sheriff=True, doctor=True):
+    def __init__(
+            self,
+            civil_count=7,
+            mafia_count=3,
+            sheriff=True,
+            doctor=True
+    ):
         self.civil_count = civil_count
         self.mafia_count = mafia_count
         self.total_players = civil_count + mafia_count
@@ -243,7 +230,10 @@ class Game(object):
 
 
 class Play(object):
-    def __init__(self, civil_count=7, mafia_count=3, sheriff=True, doctor=True):
+    def __init__(
+        self, civil_count=7, mafia_count=3,
+        sheriff=True, doctor=True
+    ):
         self.game = Game(civil_count, mafia_count, sheriff, doctor)
 
     def start(self):
@@ -252,7 +242,6 @@ class Play(object):
             if self.game.is_end():
                 break
             self.night()
-
 
     def day(self):
         self.everybody_speaks()
@@ -265,13 +254,13 @@ class Play(object):
                 listener.listen_for_day_talk(speaker.name, words)
 
     def _announce_day_kills(self, kill_list):
-        for person in self.game.list_players():
-            person.listen_for_day_verdict([victim_id])
+        for victim_id in kill_list:
+            for person in self.game.list_players():
+                person.listen_for_day_verdict([victim_id])
 
     def voting_ang_killing(self):
         votes = self.voting()
-        final_results = self.revoting(votes)
-        self.revoting(self, votes, winner_id, revoting_person)
+        self.revoting(votes)
 
     def revoting(self, votes):
         need_revote = False
@@ -280,7 +269,7 @@ class Play(object):
             defence_speech = self.game._find_player_by_id(winner).day_defence()
             for player in self.game.players():
                 player.listen_for_defence(winner, defence_speech)
-        for winner_id, winner_wotes in winner.items():
+        for winner_id, winner_votes in winner.items():
             for person in winner_votes:
                 new_vote = person.remove_vote(winner_id)
                 if new_vote:
@@ -290,10 +279,10 @@ class Play(object):
             raise NotImplemented("write here")
         else:
             return winners
-        elif: not implemented
 
+        raise NotImplemented()
 
-    def get_winners(self, voting):
+    def get_winners(self, votes):
         max_score = 0
         winners = {}
         for victim, votes in votes.items():
