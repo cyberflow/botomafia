@@ -245,7 +245,8 @@ class Play(object):
 
     def day(self):
         self.everybody_speaks()
-        self.voting_and_killing()
+        kill_list = self.voting()
+
 
     def everybody_speaks(self):
         for speaker in self.game.list_players():
@@ -258,9 +259,13 @@ class Play(object):
             for person in self.game.list_players():
                 person.listen_for_day_verdict([victim_id])
 
-    def voting_ang_killing(self):
-        votes = self.voting()
-        self.revoting(votes)
+    def voting(self):
+        neeed_revote = True
+        while need_revote:
+            votes = self.gather_initial_votes()
+            winners = self.get_winners(votes)
+
+            self.revoting(votes)
 
     def revoting(self, votes):
         need_revote = False
@@ -293,7 +298,7 @@ class Play(object):
                 winners[victim] = votes
         return winners
 
-    def voting(self):
+    def gather_initial_votes(self):
         votes = {}
         for voter in self.game.list_players():
             vote_against = voter.day_vote()
