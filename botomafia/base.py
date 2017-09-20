@@ -39,19 +39,25 @@ class Role(object):
     def day_vote(self):
         pass
 
+    def day_defence(self):
+        pass
+
     def remove_vote(self, player_id):
         return None
 
     def kill_both_players(self):
         return False
 
-    def listen_for_day_talk(self, player, speech):
+    def listen_for_day_talk(self, player_id, speech):
         pass
 
-    def listen_for_vote(self, source_player, victim_player):
+    def listen_for_vote(self, source_player_id, victim_player_id):
         pass
 
     def listen_for_day_verdict(self, kill_list):
+        pass
+
+    def listen_for_defence(self, player_id, speech):
         pass
 
     def listen_for_morning_update(self, kill_list):
@@ -210,6 +216,9 @@ class Game(object):
         if doctors:
             return doctors[0]
 
+    def players(self):
+        self._find_players_by_type(Role)
+
     def is_end(self):
         if len(self._get_mafia) >= len(self._get_civils):
             return Mafia
@@ -243,3 +252,63 @@ class Play(object):
             if self.game.is_end():
                 break
             self.night()
+
+
+    def day(self):
+        self.everybody_speaks()
+        self.voting_and_killing()
+
+    def everybody_speaks(self):
+        for speaker in self.game.list_players():
+            words = speaker.day_say()
+            for listener in self.game.list_players():
+                listener.listen_for_day_talk(speaker.name, words)
+
+    def _announce_day_kills(self, kill_list):
+        for person in self.game.list_players():
+            person.listen_for_day_verdict([victim_id])
+
+    def voting_ang_killing(self):
+        votes = self.voting()
+        final_results = self.revoting(votes)
+        self.revoting(self, votes, winner_id, revoting_person)
+
+    def revoting(self, votes):
+        need_revote = False
+        winners = self.get_winners(votes)
+        for winner in winners.keys():
+            defence_speech = self.game._find_player_by_id(winner).day_defence()
+            for player in self.game.players():
+                player.listen_for_defence(winner, defence_speech)
+        for winner_id, winner_wotes in winner.items():
+            for person in winner_votes:
+                new_vote = person.remove_vote(winner_id)
+                if new_vote:
+                    self.update_votes(votes, winner_id, person)
+                    need_revote = True
+        if need_revote:
+            raise NotImplemented("write here")
+        else:
+            return winners
+        elif: not implemented
+
+
+    def get_winners(self, voting):
+        max_score = 0
+        winners = {}
+        for victim, votes in votes.items():
+            if len(votes) > max_score:
+                max_score = len(votes)
+                winners = {victim: votes}
+            elif len(votes) == max_score:
+                winners[victim] = votes
+        return winners
+
+    def voting(self):
+        votes = {}
+        for voter in self.game.list_players():
+            vote_against = voter.day_vote()
+            for listener in self.game.list_players():
+                listener.listen_for_vote(voter.name, vote_against)
+                votes[vote_against] = votes.get(vote_against, []) + voter
+        return votes
