@@ -224,9 +224,6 @@ class Game(object):
         if doctors:
             return doctors[0]
 
-    def players(self):
-        self._find_players_by_type(Role)
-
     def new_day(self):
         self.turn += 1
         player = self.players.pop(0)
@@ -260,13 +257,19 @@ class Play(object):
     ):
         self.game = Game(civil_count, mafia_count, sheriff, doctor)
 
+    def new_day(self):
+        self.game.new_day()
+        log.info("Day %s" % self.game.turn)
+        for player in self.game.players:
+            player.new_day_notice()
+
     def start(self):
         log.info('Game started')
         for mafioso in self.game.mafia():
             mafioso.mafia_night_meet(self.game.mafia())
         while not self.game.ended():
             self.game.new_day()
-            log.info("Day %s" % self.game.turn)
+            self.new_day()
             self.day()
             if self.game.ended():
                 break
