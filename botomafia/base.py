@@ -2,6 +2,7 @@ import random
 import copy
 import logging
 from collections import Counter
+import pprint
 
 logging.basicConfig(format='%(message)s', level=logging.DEBUG)
 log = logging
@@ -128,6 +129,7 @@ class Game(object):
         self.total_players = civil_count + mafia_count
         self.create_roles(sheriff, doctor)
         self.players.sort(key=lambda player: player.name)
+        self.dead = []
 
     def create_roles(self, sheriff, doctor):
         self.players = []
@@ -166,6 +168,7 @@ class Game(object):
     def kill(self, player_id):
         player = self._find_player_by_id(player_id)
         self.players.remove(player)
+        self.dead.append(player)
         return type(player)
 
     def check_player(self, player_id):
@@ -204,7 +207,11 @@ class Game(object):
             return Civil
         else:
             return None
-
+    def result(self):
+        winner = self.ended().role
+        alive_players = [{player.name: player.role} for player in self.players]
+        dead_players = [{player.name: player.role} for player in self.dead]
+        return {'winner': winner, 'alive_players': alive_players, 'dead_players': dead_players}
 
 class Play(object):
     def __init__(
@@ -226,12 +233,12 @@ class Play(object):
                 break
             log.info("Night %s" % self.turn)
             self.night()
-        return self.game.ended()
+        return self.game.result()
 
     def day(self):
         self.everybody_speaks()
         kill_list = self.voting()
-        log.info("Day %s: voting results, remove: %s", self.turn, str(kill_list))
+        log.info("Day %s, results of voting: %s players removed", self.turn, len(kill_list))
         self.kill(kill_list)
 
     def night(self):
@@ -244,6 +251,7 @@ class Play(object):
     def doctor_turn(self):
         doctor = self.game.doctor()
         if doctor:
+            log.info("Doctor turn")
             return doctor.heal()
 
     def sheriff_turn(self):
@@ -252,8 +260,10 @@ class Play(object):
             pending_id = sheriff.check_player()
             role_type = self.game.check_player(pending_id)
             sheriff.get_check_result(pending_id, role_type)
+            log.info("Sheriff turn")
 
     def mafia_turn(self):
+        log.info("Mafia turn")
         for mafioso in self.game.mafia():
             victim_name = mafioso.night_say()
             self.broadcast("mafia say", mafioso.name, victim_name, "")
@@ -281,6 +291,7 @@ class Play(object):
     def kill(self, kill_list):
         for victim in kill_list:
             role_type = self.game.kill(victim)
+            log.info("%s was %s" % (victim, role_type.role))
             for player in self.game.players:
                 player.get_kill_notice(victim, role_type)
 
@@ -296,7 +307,7 @@ class Play(object):
         new_votes = self.gather_votes()
         new_winners = self.get_winners(new_votes)
         while winners.keys() != new_winners.keys():
-            log.info("Voting count %s" % iteration)
+            log.info("Voting, turn %s" % iteration)
             iteration += 1
             winners = copy.copy(new_winners)
             votes = copy.copy(new_votes)
@@ -359,7 +370,8 @@ class Play(object):
 def main():
     play = Play()
     result = play.start()
-    print(result)
+    print("\nGame end")
+    pprint.pprint(result)
     if result == Mafia:
         raise SystemExit(1)
     else:
