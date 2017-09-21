@@ -15,6 +15,12 @@ class Role(object):
         self.game = game
         self.configure_role()
 
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return "%s [%s]" % (self.__name__ + self.role)
+
     def configure_role(self):
         pass
 
@@ -247,6 +253,8 @@ class Play(object):
         healed_id = self.doctor_turn()
         if victim_id != healed_id:
             self.kill([victim_id])
+        else:
+            log.info("No one was killed at this nigh, thanks doctor.")
 
     def doctor_turn(self):
         doctor = self.game.doctor()
@@ -306,9 +314,9 @@ class Play(object):
         iteration = 0
         new_votes = self.gather_votes()
         new_winners = self.get_winners(new_votes)
-        while winners.keys() != new_winners.keys():
-            log.info("Voting, turn %s" % iteration)
+        while set(winners.keys()) != set(new_winners.keys()):
             iteration += 1
+            log.info("Voting, turn %s" % iteration)
             winners = copy.copy(new_winners)
             votes = copy.copy(new_votes)
             for winner_id in winners:
@@ -317,20 +325,24 @@ class Play(object):
             new_votes = self.move_votes(votes, winners)
             new_winners = self.get_winners(new_votes)
         if len(winners) > 1:
-            return self.autocatastrophy(votes, winners)
+            return self.autocatastrophe(votes, winners)
         return winners.keys()
 
-    def autocatastrophy(self, votes, winners):
+    def autocatastrophe(self, votes, winners):
+        log.info("autocatastrophe: %s players has %s voices each" %(len(winners), len(winners.values()[0])))
         voters = self.game.list_players()
         for winner in winners.keys():
             voters.remove(winner)
         yay_nay_list = map(lambda p: self.game._find_player_by_id(p).kill_many_players(winners.keys()),
                            voters
                            )
+        log.info("Vote to remove players: %s" % str(yay_nay_list))
         yay_count = sum(yay_nay_list)
         if yay_count < len(voters):
+            log.info("Players voted against players removal")
             return {}
         else:
+            log.info("%s will be removed" % winner.keys())
             return winners.keys()
 
     def move_votes(self, old_votes, winners):
@@ -339,6 +351,7 @@ class Play(object):
             for voter in his_voters:
                 new_winner_id = voter.move_vote(winner_id)
                 if new_winner_id:
+                    log.info("%s moved voice to %s" % (voter.name, new_winner_id))
                     new_votes[winner_id].remove(voter)
                     new_votes[new_winner_id].append(voter)
                     self.broadcast("move vote", voter.name, new_winner_id)
