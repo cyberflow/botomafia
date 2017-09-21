@@ -68,6 +68,7 @@ class Civil(Role):
 
     def day_vote(self):
         return random.choice(self.game.list_players(skip=self.name))
+        #return self.game.list_players(skip=self.name)[0]
 
 
 class Sheriff(Civil):
@@ -86,6 +87,10 @@ class Sheriff(Civil):
         else:
             candidate = random.choice(candidates)
         return candidate
+
+    def get_kill_notice(self, player_id, role_type):
+        if player_id in self.known_mafia:
+            self.known_mafia.remove(player_id)
 
     def day_vote(self):
         if self.known_mafia:
@@ -169,6 +174,8 @@ class Game(object):
         for player in self.players:
             if player.name == player_id:
                 return player
+        import pdb
+        pdb.set_trace()
         raise Exception("Player %s not found, existing players" % str(player_id), str(self.players))
 
     def _find_players_by_type(self, player_type):
