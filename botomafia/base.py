@@ -6,7 +6,7 @@ from collections import Counter
 import pprint
 
 logging.basicConfig(format='%(message)s', level=logging.DEBUG)
-log = logging.getLogger(__name__)
+log = logging.getLogger('mafia')
 
 
 class Role(object):
@@ -25,6 +25,9 @@ class Role(object):
     def configure_role(self):
         pass
 
+    def new_day_notice(self):
+        pass
+
     def day_say(self):
         return None
 
@@ -38,7 +41,7 @@ class Role(object):
         return None
 
     def kill_many_players(self, kill_list):
-        return False
+        return True
 
     def listen(self, speech_type, speaker_id, target_id, speech):
         pass
@@ -148,6 +151,7 @@ class Game(object):
         self.create_roles(sheriff, doctor)
         self.players.sort(key=lambda player: player.name)
         self.dead = []
+        self.turn = 0
 
     def create_roles(self, sheriff, doctor):
         self.players = []
@@ -168,7 +172,10 @@ class Game(object):
             self.players.append(Civil(name=namegen.next(), game=self))
 
     def list_players(self, skip=[]):
-        return [player.name for player in self.players if player.name not in skip]
+        return [
+            player.name for player in
+            self.players if player.name not in skip
+        ]
 
     def _find_player_by_id(self, player_id):
         for player in self.players:
@@ -176,7 +183,9 @@ class Game(object):
                 return player
         import pdb
         pdb.set_trace()
-        raise Exception("Player %s not found, existing players" % str(player_id), str(self.players))
+        raise Exception("Player %s not found, existing players" % str(
+            player_id
+        ), str(self.players))
 
     def _find_players_by_type(self, player_type):
         result = []
@@ -218,6 +227,11 @@ class Game(object):
     def players(self):
         self._find_players_by_type(Role)
 
+    def new_day(self):
+        self.turn += 1
+        player = self.players.pop(0)
+        self.players.append(player)
+
     def ended(self):
         print("mafia", len(self.mafia()))
         print("civils", len(self.civils()))
@@ -245,19 +259,18 @@ class Play(object):
         sheriff=True, doctor=True
     ):
         self.game = Game(civil_count, mafia_count, sheriff, doctor)
-        self.turn = 0
 
     def start(self):
         log.info('Game started')
         for mafioso in self.game.mafia():
             mafioso.mafia_night_meet(self.game.mafia())
         while not self.game.ended():
-            self.turn += 1
-            log.info("Day %s" % self.turn)
+            self.game.new_day()
+            log.info("Day %s" % self.game.turn)
             self.day()
             if self.game.ended():
                 break
-            log.info("Night %s" % self.turn)
+            log.info("Night %s" % self.game.turn)
             self.night()
         return self.game.result()
 
@@ -265,7 +278,7 @@ class Play(object):
         self.everybody_speaks()
         kill_list = self.voting()
         log.info("Day %s, results of voting: %s players removed",
-                 self.turn, len(kill_list)
+                 self.game.turn, len(kill_list)
                  )
         self.kill(kill_list)
 
@@ -276,7 +289,7 @@ class Play(object):
         if victim_id != healed_id:
             self.kill([victim_id])
         else:
-            log.info("No one was killed at this nigh, thanks doctor.")
+            log.info("No one was killed at this night")
 
     def doctor_turn(self):
         doctor = self.game.doctor()
@@ -401,7 +414,7 @@ class Play(object):
         for voter in self.game.players:
             vote_against = voter.day_vote()
             log.info("Day %s. %s voted against %s." % (
-                self.turn, voter.name, vote_against
+                self.game.turn, voter.name, vote_against
             ))
             self.broadcast("day_vote", voter.name, vote_against, None)
             votes[vote_against] = votes.get(vote_against, []) + [voter]
