@@ -3,10 +3,19 @@ import random
 import copy
 import logging
 from collections import Counter
-import pprint
 
-logging.basicConfig(format='%(message)s', level=logging.DEBUG)
-log = logging.getLogger('mafia')
+
+log = logging.getLogger('botomafia')
+log.setLevel(logging.INFO)
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+
+formatter = logging.Formatter('%(message)s')
+
+ch.setFormatter(formatter)
+
+log.addHandler(ch)
 
 
 class Role(object):
@@ -230,8 +239,6 @@ class Game(object):
         self.players.append(player)
 
     def ended(self):
-        print("mafia", len(self.mafia()))
-        print("civils", len(self.civils()))
         if len(self.mafia()) >= len(self.civils()):
             return Mafia
         elif len(self.mafia()) == 0:
@@ -427,8 +434,7 @@ class Play(object):
 def game():
     play = Play()
     result = play.start()
-    print("\nGame end")
-    pprint.pprint(result)
+    log.info(result)
     if result['winner'] == 'Mafia':
         return 1
     else:
@@ -442,12 +448,14 @@ def main():
         SystemExit(result)
     else:
         print("Statistics mode")
+        log.setLevel(logging.ERROR)
         mafia_count = 0
         total_games = int(sys.argv[1])
         for g in range(total_games):
             mafia_count += game()
         print("Played %s games, mafia won %s times (%s %%)" % (
-            total_games, mafia_count, float(mafia_count)*100/total_games
+            total_games, mafia_count,
+            round(float(mafia_count)*100/total_games, 2)
         ))
 
 
