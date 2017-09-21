@@ -6,7 +6,7 @@ from collections import Counter
 import pprint
 
 logging.basicConfig(format='%(message)s', level=logging.DEBUG)
-log = logging
+log = logging.getLogger(__name__)
 
 
 class Role(object):
@@ -68,7 +68,7 @@ class Civil(Role):
 
     def day_vote(self):
         return random.choice(self.game.list_players(skip=self.name))
-        #return self.game.list_players(skip=self.name)[0]
+        # return self.game.list_players(skip=self.name)[0]
 
 
 class Sheriff(Civil):
@@ -227,11 +227,17 @@ class Game(object):
             return Civil
         else:
             return None
+
     def result(self):
         winner = self.ended().role
         alive_players = [{player.name: player.role} for player in self.players]
         dead_players = [{player.name: player.role} for player in self.dead]
-        return {'winner': winner, 'alive_players': alive_players, 'dead_players': dead_players}
+        return {
+            'winner': winner,
+            'alive_players': alive_players,
+            'dead_players': dead_players
+        }
+
 
 class Play(object):
     def __init__(
@@ -258,7 +264,9 @@ class Play(object):
     def day(self):
         self.everybody_speaks()
         kill_list = self.voting()
-        log.info("Day %s, results of voting: %s players removed", self.turn, len(kill_list))
+        log.info("Day %s, results of voting: %s players removed",
+                 self.turn, len(kill_list)
+                 )
         self.kill(kill_list)
 
     def night(self):
@@ -293,11 +301,10 @@ class Play(object):
         for mafioso in self.game.mafia():
             votes.append(mafioso.night_vote())
             results = Counter(votes)
-            for victim, score in results.items():
-                if score > len(self.game.mafia())/2:
-                    return victim
+        for victim, score in results.items():
+            if score > len(self.game.mafia())/2:
+                return victim
         raise Exception("Mafia unable to deside. Votes: %s" % votes)
-
 
     def broadcast(
         self, speech_type, speaker_id, target_id=None,
@@ -343,18 +350,22 @@ class Play(object):
         return winners.keys()
 
     def autocatastrophe(self, votes, winners):
-        log.info("autocatastrophe: %s players has %s voices each" %(len(winners), len(winners.values()[0])))
+        log.info("autocatastrophe: %s players has %s voices each" % (
+            len(winners), len(winners.values()[0]))
+        )
         voters = self.game.list_players()
         for winner in winners.keys():
             voters.remove(winner)
-        yay_nay_list = map(lambda p: self.game._find_player_by_id(p).kill_many_players(winners.keys()),
-                           voters
-                           )
+        yay_nay_list = [
+            self.game._find_player_by_id(voter).kill_many_players(
+                winners.keys()
+            ) for voter in voters
+        ]
         log.info("Vote to remove players: %s" % str(yay_nay_list))
         yay_count = sum(yay_nay_list)
-        if yay_count < len(voters):
+        if yay_count < len(voters)/2:
             log.info("Players voted against players removal")
-            return {}
+            return []
         else:
             log.info("%s will be removed" % winners.keys())
             return winners.keys()
@@ -365,7 +376,10 @@ class Play(object):
             for voter in his_voters:
                 new_winner_id = voter.move_vote(winner_id)
                 if new_winner_id:
-                    log.info("%s moved voice to %s" % (voter.name, new_winner_id))
+                    log.info("%s moved voice to %s" % (
+                        voter.name,
+                        new_winner_id
+                    ))
                     new_votes[winner_id].remove(voter)
                     new_votes[new_winner_id].append(voter)
                     self.broadcast("move vote", voter.name, new_winner_id)
