@@ -1,3 +1,4 @@
+import sys
 import random
 import copy
 import logging
@@ -19,7 +20,7 @@ class Role(object):
         return self.name
 
     def __repr__(self):
-        return "%s [%s]" % (self.__name__ + self.role)
+        return "%s [%s]" % (self.name, self.role)
 
     def configure_role(self):
         pass
@@ -73,23 +74,29 @@ class Sheriff(Civil):
     role = "Sheriff"
 
     def configure_role(self):
-        self.trusted = set([self.name])
-        self.known_mafia = set([])
+        self.trusted = [self.name]
+        self.known_mafia = []
 
     def check_player(self):
         candidates = self.game.list_players(
-            skip=self.trusted & self.known_mafia
+            skip=self.trusted + self.known_mafia
         )
-        candidate = random.choice(candidates)
-        if not candidate:
+        if not candidates:
             candidate = self.name
+        else:
+            candidate = random.choice(candidates)
         return candidate
+
+    def day_vote(self):
+        if self.known_mafia:
+            return self.known_mafia[0]
+        return random.choice(self.game.list_players(skip=self.trusted))
 
     def get_check_result(self, player_id, status):
         if status == Civil:
-            self.trusted.add(player_id)
+            self.trusted.append(player_id)
         elif status == Mafia:
-            self.known_mafia.add(player_id)
+            self.known_mafia.append(player_id)
 
 
 class Doctor(Civil):
@@ -162,7 +169,7 @@ class Game(object):
         for player in self.players:
             if player.name == player_id:
                 return player
-        raise Exception("Player %s not found" % str(player_id))
+        raise Exception("Player %s not found, existing players" % str(player_id), str(self.players))
 
     def _find_players_by_type(self, player_type):
         result = []
@@ -319,7 +326,7 @@ class Play(object):
             log.info("Voting, turn %s" % iteration)
             winners = copy.copy(new_winners)
             votes = copy.copy(new_votes)
-            for winner_id in winners:
+            for winner_id in winners.keys():
                 defence = self.game._find_player_by_id(winner_id).day_defence()
                 self.broadcast("defence", winner_id, None, defence)
             new_votes = self.move_votes(votes, winners)
@@ -342,7 +349,7 @@ class Play(object):
             log.info("Players voted against players removal")
             return {}
         else:
-            log.info("%s will be removed" % winner.keys())
+            log.info("%s will be removed" % winners.keys())
             return winners.keys()
 
     def move_votes(self, old_votes, winners):
@@ -380,15 +387,31 @@ class Play(object):
         return votes
 
 
-def main():
+def game():
     play = Play()
     result = play.start()
     print("\nGame end")
     pprint.pprint(result)
-    if result == Mafia:
-        raise SystemExit(1)
+    if result['winner'] == 'Mafia':
+        return 1
     else:
-        raise SystemExit(0)
+        return 0
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Single game mode")
+        result = game()
+        SystemExit(result)
+    else:
+        print("Statistics mode")
+        mafia_count = 0
+        total_games = int(sys.argv[1])
+        for g in range(total_games):
+            mafia_count += game()
+        print("Played %s games, mafia won %s times (%s %%)" % (
+            total_games, mafia_count, float(mafia_count)*100/total_games
+        ))
 
 
 if __name__ == '__main__':
