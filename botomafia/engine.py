@@ -4,18 +4,6 @@ import copy
 from collections import Counter
 import logging
 
-log = logging.getLogger('botomafia')
-log.setLevel(logging.INFO)
-
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-
-formatter = logging.Formatter('%(message)s')
-
-ch.setFormatter(formatter)
-
-log.addHandler(ch)
-
 
 class Game(object):
     def __init__(
@@ -34,6 +22,18 @@ class Game(object):
         self.players.sort(key=lambda player: player.name)
         self.dead = []
         self.turn = 0
+        self.log = self.init_logging()
+
+    @staticmethod
+    def init_logging():
+        log = logging.getLogger('botomafia')
+        log.setLevel(logging.INFO)
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(message)s')
+        ch.setFormatter(formatter)
+        log.addHandler(ch)
+        return log
 
     def create_roles(self, sheriff, doctor):
         self.players = []
@@ -137,7 +137,7 @@ class Game(object):
             'alive_players': alive_players,
             'dead_players': dead_players
         }
-        log.info(res)
+        self.log.info(res)
         return res
 
 
@@ -147,19 +147,18 @@ class Play(object):
         sheriff=True, doctor=True, silent=False
     ):
 
-        if silent:
-            log.setLevel(logging.ERROR)
-
         self.game = Game(civil_count, mafia_count, sheriff, doctor)
+        if silent:
+            self.game.log.setLevel(logging.ERROR)
 
     def new_day(self):
         self.game.new_day()
-        log.info("Day %s" % self.game.turn)
+        self.game.log.info("Day %s" % self.game.turn)
         for player in self.game.players:
             player.new_day_notice()
 
     def start(self):
-        log.info('Game started')
+        self.game.log.info('Game started')
         for mafioso in self.game.mafia():
             mafioso.mafia_night_meet(self.game.mafia())
         while not self.game.ended():
@@ -167,16 +166,15 @@ class Play(object):
             self.day()
             if self.game.ended():
                 break
-            log.info("Night %s" % self.game.turn)
+            self.game.log.info("Night %s" % self.game.turn)
             self.night()
         return self.game.result()
 
     def day(self):
         self.everybody_speaks()
         kill_list = self.voting()
-        log.info("Day %s, results of voting: %s players removed",
-                 self.game.turn, len(kill_list)
-                 )
+        self.game.log.info("Day %s, results of voting: %s players removed",
+                           self.game.turn, len(kill_list))
         self.kill(Civil, kill_list)
 
     def night(self):
@@ -186,13 +184,13 @@ class Play(object):
         if victim_id != healed_id:
             self.kill(Mafia, [victim_id])
         else:
-            log.info("No one was killed at this night")
+            self.game.log.info("No one was killed at this night")
             self.kill(Mafia, [])
 
     def doctor_turn(self):
         doctor = self.game.doctor()
         if doctor:
-            log.info("Doctor turn")
+            self.game.log.info("Doctor turn")
             return doctor.heal()
 
     def sheriff_turn(self):
@@ -201,10 +199,10 @@ class Play(object):
             pending_id = sheriff.check_player()
             role_type = self.game.check_player(pending_id)
             sheriff.get_check_result(pending_id, role_type)
-            log.info("Sheriff turn")
+            self.game.log.info("Sheriff turn")
 
     def mafia_turn(self):
-        log.info("Mafia turn")
+        self.game.log.info("Mafia turn")
         for mafioso in self.game.mafia():
             target_id = mafioso.night_say()
             self.broadcast("mafia say", mafioso.name, target_id, "")
@@ -235,7 +233,7 @@ class Play(object):
         if kill_list:
             for victim in kill_list:
                 role_type = self.game.kill(victim)
-                log.info("%s was %s [killed by %s's]" % (
+                self.game.log.info("%s was %s [killed by %s's]" % (
                     victim, role_type.role, initiator.role
                 ))
                 for player in self.game.players:
@@ -257,7 +255,7 @@ class Play(object):
         new_winners = self.get_winners(new_votes)
         while set(winners.keys()) != set(new_winners.keys()):
             iteration += 1
-            log.info("Voting, turn %s" % iteration)
+            self.game.log.info("Voting, turn %s" % iteration)
             winners = copy.copy(new_winners)
             votes = copy.copy(new_votes)
             for winner_id in winners.keys():
@@ -270,7 +268,7 @@ class Play(object):
         return winners.keys()
 
     def autocatastrophe(self, votes, winners):
-        log.info("autocatastrophe: %s players has %s voices each" % (
+        self.game.log.info("autocatastrophe: %s players has %s voices each" % (
             len(winners), len(winners.values()[0]))
         )
         voters = self.game.list_players()
@@ -281,13 +279,13 @@ class Play(object):
                 winners.keys()
             ) for voter in voters
         ]
-        log.info("Vote to remove players: %s" % str(yay_nay_list))
+        self.game.log.info("Vote to remove players: %s" % str(yay_nay_list))
         yay_count = sum(yay_nay_list)
         if yay_count < len(voters)/2:
-            log.info("Players voted against players removal")
+            self.game.log.info("Players voted against players removal")
             return []
         else:
-            log.info("%s will be removed" % winners.keys())
+            self.game.log.info("%s will be removed" % winners.keys())
             return winners.keys()
 
     def move_votes(self, old_votes, winners):
@@ -296,7 +294,7 @@ class Play(object):
             for voter in his_voters:
                 new_winner_id = voter.move_vote(winner_id)
                 if new_winner_id:
-                    log.info("%s moved voice to %s" % (
+                    self.game.log.info("%s moved voice to %s" % (
                         voter.name,
                         new_winner_id
                     ))
@@ -320,7 +318,7 @@ class Play(object):
         votes = {}
         for voter in self.game.players:
             vote_against = voter.day_vote()
-            log.info("Day %s. %s voted against %s." % (
+            self.game.log.info("Day %s. %s voted against %s." % (
                 self.game.turn, voter.name, vote_against
             ))
             self.broadcast("day_vote", voter.name, vote_against, None)
