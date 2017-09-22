@@ -220,11 +220,15 @@ class Play(object):
             )
 
     def kill(self, initiator, kill_list):
-        for victim in kill_list:
-            role_type = self.game.kill(victim)
-            log.info("%s was %s [killed by %s's]" % (victim, role_type.role, initiator.role))
+        if kill_list:
+            for victim in kill_list:
+                role_type = self.game.kill(victim)
+                log.info("%s was %s [killed by %s's]" % (victim, role_type.role, initiator.role))
+                for player in self.game.players:
+                    player.get_kill_notice(victim, initiator, role_type)
+        else:
             for player in self.game.players:
-                player.get_kill_notice(victim, initiator, role_type)
+                player.get_kill_notice([], initiator, None)
 
     def everybody_speaks(self):
         for speaker in self.game.players:
