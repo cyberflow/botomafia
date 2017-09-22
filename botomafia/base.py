@@ -2,7 +2,7 @@ import sys
 from engine import Play
 
 
-def game(silent=False):
+def one_game(silent=False):
     play = Play(silent=silent)
     result = play.start()
     if result['winner'] == 'Mafia':
@@ -14,17 +14,20 @@ def game(silent=False):
 def main():
     if len(sys.argv) < 2:
         print("Single game mode")
-        result = game()
+        result = one_game()
         SystemExit(result)
     else:
         print("Statistics mode")
         mafia_count = 0
         total_games = int(sys.argv[1])
         for g in range(total_games):
-            mafia_count += game(silent=True)
-        print("Played %s games, mafia won %s times (%s %%)" % (
-            total_games, mafia_count,
-            round(float(mafia_count)*100/total_games, 2)
+            mafia_count += one_game(silent=True)
+        print("Played %s games, mafia won %s times" % (
+            total_games, mafia_count
+        ))
+        print("Statistics: %s %% for mafia, %s %% for civils." % (
+            round(float(mafia_count)*100/total_games, 2),
+            100 - round(float(mafia_count)*100/total_games, 2)
         ))
 
 

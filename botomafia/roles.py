@@ -132,11 +132,29 @@ class Mafia(Role):
     side = "Mafia"
     role = "Mafia"
 
+    def configure_role(self):
+        self.night_kill = None
+
     def day_vote(self):
-        return self.game.list_players(skip=self.mafia)[0]
+        return random.choice(self.game.list_players(skip=self.mafia))
 
     def mafia_night_meet(self, mafia):
         self.mafia = [m.name for m in mafia]
 
+    def night_say(self):
+        if not self.night_kill:
+            self.night_kill = random.choice(
+                self.game.list_players(skip=self.mafia)
+            )
+        return self.night_kill
+
+    def listen(self, speech_type, speaker_id, target_id, speech):
+            if speech_type == "mafia say":
+                if target_id:
+                    self.night_kill = target_id
+
     def night_vote(self):
-        return self.game.list_players(skip=self.mafia)[0]
+        return self.night_kill
+
+    def new_day_notice(self):
+        self.night_kill = None

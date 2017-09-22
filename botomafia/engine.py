@@ -106,6 +106,15 @@ class Game(object):
         if doctors:
             return doctors[0]
 
+    def get_status(self):
+        return {
+            "turn": self.turn,
+            "civils": len(self.civils()),
+            "mafia": len(self.mafia()),
+            "alive": len(self.players),
+            "dead": len(self.dead)
+        }
+
     def new_day(self):
         self.turn += 1
         player = self.players.pop(0)
@@ -197,16 +206,19 @@ class Play(object):
     def mafia_turn(self):
         log.info("Mafia turn")
         for mafioso in self.game.mafia():
-            victim_name = mafioso.night_say()
-            self.broadcast("mafia say", mafioso.name, victim_name, "")
-        votes = []
-        for mafioso in self.game.mafia():
-            votes.append(mafioso.night_vote())
-            results = Counter(votes)
-        for victim, score in results.items():
-            if score > len(self.game.mafia())/2:
-                return victim
-        raise Exception("Mafia unable to deside. Votes: %s" % votes)
+            target_id = mafioso.night_say()
+            self.broadcast("mafia say", mafioso.name, target_id, "")
+        for attempt in range(10):
+            votes = []
+            for mafioso in self.game.mafia():
+                votes.append(mafioso.night_vote())
+                results = Counter(votes)
+            for victim, score in results.items():
+                if score > len(self.game.mafia())/2:
+                    return victim
+        else:
+            raise Exception("Mafia unable to deside in 1000 interation."
+                            " Votes: %s" % votes)
 
     def broadcast(
         self, speech_type, speaker_id, target_id=None,
@@ -223,7 +235,9 @@ class Play(object):
         if kill_list:
             for victim in kill_list:
                 role_type = self.game.kill(victim)
-                log.info("%s was %s [killed by %s's]" % (victim, role_type.role, initiator.role))
+                log.info("%s was %s [killed by %s's]" % (
+                    victim, role_type.role, initiator.role
+                ))
                 for player in self.game.players:
                     player.get_kill_notice(victim, initiator, role_type)
         else:
