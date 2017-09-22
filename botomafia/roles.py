@@ -38,7 +38,7 @@ class Role(object):
     def listen(self, speech_type, speaker_id, target_id, speech):
         pass
 
-    def get_kill_notice(self, player_id, role_type):
+    def get_kill_notice(self, initiator, player_id, role_type):
         pass
 
     def night_say(self):
@@ -83,7 +83,7 @@ class Sheriff(Civil):
             candidate = random.choice(candidates)
         return candidate
 
-    def get_kill_notice(self, player_id, role_type):
+    def get_kill_notice(self, player_id, initiator, role_type):
         if player_id in self.known_mafia:
             self.known_mafia.remove(player_id)
 

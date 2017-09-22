@@ -168,16 +168,17 @@ class Play(object):
         log.info("Day %s, results of voting: %s players removed",
                  self.game.turn, len(kill_list)
                  )
-        self.kill(kill_list)
+        self.kill(Civil, kill_list)
 
     def night(self):
         victim_id = self.mafia_turn()
         self.sheriff_turn()
         healed_id = self.doctor_turn()
         if victim_id != healed_id:
-            self.kill([victim_id])
+            self.kill(Mafia, [victim_id])
         else:
             log.info("No one was killed at this night")
+            self.kill(Mafia, [])
 
     def doctor_turn(self):
         doctor = self.game.doctor()
@@ -218,12 +219,12 @@ class Play(object):
                 speech_type, speaker_id, target_id, speech
             )
 
-    def kill(self, kill_list):
+    def kill(self, initiator, kill_list):
         for victim in kill_list:
             role_type = self.game.kill(victim)
-            log.info("%s was %s" % (victim, role_type.role))
+            log.info("%s was %s [killed by %s's]" % (victim, role_type.role, initiator.role))
             for player in self.game.players:
-                player.get_kill_notice(victim, role_type)
+                player.get_kill_notice(victim, initiator, role_type)
 
     def everybody_speaks(self):
         for speaker in self.game.players:
