@@ -38,7 +38,7 @@ class Game(object):
     def create_roles(self, sheriff, doctor):
         self.players = []
         need_to_create = self.total_players
-        names = ['player ' + str(y) for y in range(need_to_create + 1)]
+        names = ['player ' + str(y) for y in range(1, need_to_create + 1)]
         random.shuffle(names)
         namegen = (name for name in names)
         if sheriff:
@@ -154,7 +154,6 @@ class Play(object):
         for mafioso in self.game.mafia():
             mafioso.mafia_night_meet(self.game.mafia())
         while not self.game.ended():
-            self.game.new_day()
             self.new_day()
             self.day()
             if self.game.ended():
