@@ -104,6 +104,8 @@ class Doctor(Civil):
 
     def configure_role(self):
         self.healed = False
+        self.night_heal = None
+        self.trusted = [self.name]
 
     def heal(self):
         candidates = self.game.list_players()
@@ -112,7 +114,18 @@ class Doctor(Civil):
         candidate = random.choice(candidates)
         if candidate == self.name:
             self.healed = True
+        else:
+            self.night_heal = candidate
         return candidate
+
+    def day_vote(self):
+        return random.choice(self.game.list_players(skip=self.trusted))
+
+    def get_kill_notice(self, player_id, initiator, role_type):
+        if (initiator is Mafia):
+            if not player_id and self.night_heal:
+                self.trusted.append(self.night_heal)
+            self.night_heal = None
 
 
 class Mafia(Role):
