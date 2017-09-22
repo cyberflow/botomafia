@@ -228,7 +228,7 @@ class Play(object):
                     player.get_kill_notice(victim, initiator, role_type)
         else:
             for player in self.game.players:
-                player.get_kill_notice([], initiator, None)
+                player.get_kill_notice(None, initiator, None)
 
     def everybody_speaks(self):
         for speaker in self.game.players:
