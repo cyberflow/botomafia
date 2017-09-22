@@ -318,6 +318,10 @@ class Play(object):
         votes = {}
         for voter in self.game.players:
             vote_against = voter.day_vote()
+            if voter.name == vote_against:
+                raise Exception("Player %s voting against %s" % (
+                                voter, vote_against
+                ))
             self.game.log.info("Day %s. %s voted against %s." % (
                 self.game.turn, voter.name, vote_against
             ))
